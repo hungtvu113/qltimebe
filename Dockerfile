@@ -40,7 +40,7 @@ ENV PORT=3001
 ENV GEMINI_API_KEY=
 ENV EMAIL_USER=tranhunggit@gmail.com
 ENV EMAIL_PASSWORD="bgai gzsr jggg fbzl"
-ENV FRONTEND_URL=https://qltime.vercel.app/
+ENV FRONTEND_URL=https://qltime.vercel.app
 
 # Expose port
 EXPOSE 3001
