@@ -1,4 +1,4 @@
-# Multi-stage build cho NestJS
+# Multi-stage build cho NestJS - Render Production
 FROM node:18-alpine AS builder
 
 # Thiết lập thư mục làm việc
@@ -31,16 +31,9 @@ RUN npm ci --omit=dev && npm cache clean --force
 # Sao chép built application từ builder stage
 COPY --from=builder /app/dist ./dist
 
-# Thiết lập biến môi trường
-ENV MONGODB_URI=mongodb+srv://tranhung:123TTHpro@csdlqltime.uk8ji20.mongodb.net/qltime?retryWrites=true&w=majority
-ENV JWT_SECRET=your_jwt_secret_key
-ENV JWT_EXPIRES=1d
+# Thiết lập biến môi trường mặc định (sẽ được override bởi Render)
 ENV NODE_ENV=production
 ENV PORT=3001
-ENV GEMINI_API_KEY=
-ENV EMAIL_USER=tranhunggit@gmail.com
-ENV EMAIL_PASSWORD="bgai gzsr jggg fbzl"
-ENV FRONTEND_URL=https://qltime.vercel.app/
 
 # Expose port
 EXPOSE 3001
