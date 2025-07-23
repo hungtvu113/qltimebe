@@ -1,0 +1,18 @@
+# Development Dockerfile cho Backend (NestJS)
+FROM node:18-alpine
+
+# Thiết lập thư mục làm việc
+WORKDIR /app
+
+# Cài đặt dependencies
+COPY package*.json ./
+RUN npm install
+
+# Sao chép source code
+COPY . .
+
+# Expose port
+EXPOSE 3001
+
+# Khởi động ứng dụng ở chế độ development với hot reload
+CMD ["npm", "run", "start:dev"]
