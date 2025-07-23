@@ -26,13 +26,10 @@ WORKDIR /app
 COPY package*.json ./
 
 # Cài đặt chỉ production dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Sao chép built application từ builder stage
 COPY --from=builder /app/dist ./dist
-
-# Sao chép các files cần thiết khác
-COPY --from=builder /app/node_modules ./node_modules
 
 # Expose port
 EXPOSE 3001
