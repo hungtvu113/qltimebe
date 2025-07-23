@@ -16,6 +16,23 @@ export class EmailService {
 
   constructor(private configService: ConfigService) {
     this.createTransporter();
+    this.logConfiguration();
+  }
+
+  private logConfiguration() {
+    const frontendUrl = this.configService.get('FRONTEND_URL');
+    const emailUser = this.configService.get('EMAIL_USER');
+
+    this.logger.log(`📧 Email Service Configuration:`);
+    this.logger.log(`   EMAIL_USER: ${emailUser || 'NOT SET'}`);
+    this.logger.log(`   FRONTEND_URL: ${frontendUrl || 'NOT SET (will use default: https://qltime.vercel.app)'}`);
+    this.logger.log(`   Final frontend URL: ${this.getFrontendUrl()}`);
+  }
+
+  private getFrontendUrl(): string {
+    const url = this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app';
+    // Loại bỏ dấu / ở cuối nếu có
+    return url.endsWith('/') ? url.slice(0, -1) : url;
   }
 
   private createTransporter() {
@@ -29,7 +46,7 @@ export class EmailService {
     });
 
     // Verify connection
-    this.transporter.verify((error, success) => {
+    this.transporter.verify((error) => {
       if (error) {
         this.logger.error('Email service connection failed:', error);
       } else {
@@ -40,27 +57,47 @@ export class EmailService {
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
     try {
-      // Nếu không có email credentials, chỉ log để test
-      if (!this.configService.get<string>('EMAIL_USER')) {
+      this.logger.log(`📧 Attempting to send email to: ${options.to}`);
+      this.logger.log(`📧 Subject: ${options.subject}`);
+
+      // Kiểm tra email credentials
+      const emailUser = this.configService.get<string>('EMAIL_USER');
+      const emailPassword = this.configService.get<string>('EMAIL_PASSWORD');
+
+      if (!emailUser || !emailPassword) {
+        this.logger.warn(`📧 [TEST MODE] No email credentials configured`);
         this.logger.log(`📧 [TEST MODE] Email would be sent to: ${options.to}`);
         this.logger.log(`📧 [TEST MODE] Subject: ${options.subject}`);
-        this.logger.log(`📧 [TEST MODE] Content: ${options.text?.substring(0, 100) || 'No content'}...`);
+        this.logger.log(`📧 [TEST MODE] Content preview: ${options.text?.substring(0, 100) || 'No text content'}...`);
+        this.logger.log(`📧 [TEST MODE] HTML length: ${options.html?.length || 0} characters`);
         return true; // Giả lập gửi thành công
       }
 
+      this.logger.log(`📧 Using email credentials: ${emailUser}`);
+
       const mailOptions = {
-        from: `"QLTime" <${this.configService.get('EMAIL_USER')}>`,
+        from: `"QLTime" <${emailUser}>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
         text: options.text,
       };
 
+      this.logger.log(`📧 Sending email via transporter...`);
       const result = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Email sent successfully to ${options.to}: ${result.messageId}`);
+      this.logger.log(`📧 ✅ Email sent successfully to ${options.to}`);
+      this.logger.log(`📧 Message ID: ${result.messageId}`);
+      this.logger.log(`📧 Response: ${result.response}`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}:`, error);
+      this.logger.error(`📧 ❌ Failed to send email to ${options.to}:`);
+      this.logger.error(`📧 Error details:`, error);
+      if (error.code) {
+        this.logger.error(`📧 Error code: ${error.code}`);
+      }
+      if (error.response) {
+        this.logger.error(`📧 SMTP response: ${error.response}`);
+      }
       return false;
     }
   }
@@ -86,7 +123,7 @@ export class EmailService {
         </div>
         
         <p>
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/tasks"
+          <a href="${this.getFrontendUrl()}/tasks"
              style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
             Xem tất cả công việc
           </a>
@@ -95,7 +132,7 @@ export class EmailService {
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
         <p style="font-size: 12px; color: #9ca3af;">
           Email này được gửi từ QLTime.
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/unsubscribe?token={{unsubscribeToken}}"
+          <a href="${this.getFrontendUrl()}/unsubscribe?token={{unsubscribeToken}}"
              style="color: #6b7280;">Hủy đăng ký</a>
         </p>
       </div>
@@ -105,7 +142,7 @@ export class EmailService {
       to: email,
       subject,
       html,
-      text: `QLTime - Bạn có ${tasks.length} công việc sắp hết hạn. Truy cập ${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/tasks để xem chi tiết.`
+      text: `QLTime - Bạn có ${tasks.length} công việc sắp hết hạn. Truy cập ${this.getFrontendUrl()}/tasks để xem chi tiết.`
     });
   }
 
@@ -127,7 +164,7 @@ export class EmailService {
         </div>
         
         <p>
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}"
+          <a href="${this.getFrontendUrl()}"
              style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
             Bắt đầu sử dụng QLTime
           </a>
@@ -136,7 +173,7 @@ export class EmailService {
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
         <p style="font-size: 12px; color: #9ca3af;">
           Email này được gửi từ QLTime.
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/unsubscribe?token={{unsubscribeToken}}"
+          <a href="${this.getFrontendUrl()}/unsubscribe?token={{unsubscribeToken}}"
              style="color: #6b7280;">Hủy đăng ký</a>
         </p>
       </div>
@@ -146,7 +183,7 @@ export class EmailService {
       to: email,
       subject,
       html,
-      text: `Chào mừng ${name} đến với QLTime! Truy cập ${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'} để bắt đầu.`
+      text: `Chào mừng ${name} đến với QLTime! Truy cập ${this.getFrontendUrl()} để bắt đầu.`
     });
   }
 
@@ -174,11 +211,11 @@ export class EmailService {
         </div>
 
         <p style="text-align: center;">
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}"
+          <a href="${this.getFrontendUrl()}"
              style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 10px;">
             Khám phá QLTime
           </a>
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/register"
+          <a href="${this.getFrontendUrl()}/register"
              style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 10px;">
             Tạo tài khoản miễn phí
           </a>
@@ -187,7 +224,7 @@ export class EmailService {
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
         <p style="font-size: 12px; color: #9ca3af; text-align: center;">
           Email này được gửi từ QLTime.
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/unsubscribe?token=${unsubscribeToken}"
+          <a href="${this.getFrontendUrl()}/unsubscribe?token=${unsubscribeToken}"
              style="color: #6b7280;">Hủy đăng ký</a>
         </p>
       </div>
@@ -197,7 +234,7 @@ export class EmailService {
       to: email,
       subject,
       html,
-      text: `Chào mừng ${name} đến với QLTime! Bạn đã đăng ký nhận thông báo thành công. Truy cập ${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'} để khám phá.`
+      text: `Chào mừng ${name} đến với QLTime! Bạn đã đăng ký nhận thông báo thành công. Truy cập ${this.getFrontendUrl()} để khám phá.`
     });
   }
 
@@ -233,11 +270,11 @@ export class EmailService {
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/tasks"
+          <a href="${this.getFrontendUrl()}/tasks"
              style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 5px;">
             📋 Xem tất cả công việc
           </a>
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/login"
+          <a href="${this.getFrontendUrl()}/login"
              style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 5px;">
             🚀 Đăng nhập QLTime
           </a>
@@ -252,7 +289,7 @@ export class EmailService {
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
         <p style="font-size: 12px; color: #9ca3af; text-align: center;">
           Email này được gửi từ QLTime.
-          <a href="${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/unsubscribe?token=${unsubscribeToken}"
+          <a href="${this.getFrontendUrl()}/unsubscribe?token=${unsubscribeToken}"
              style="color: #6b7280;">Hủy đăng ký</a>
         </p>
       </div>
@@ -270,9 +307,9 @@ ${tasks.map(task => {
   return `- ${task.title}\n  Hết hạn: ${dueDate.toLocaleDateString('vi-VN')} lúc ${dueDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
 }).join('\n\n')}
 
-Truy cập ${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/tasks để xem chi tiết.
+Truy cập ${this.getFrontendUrl()}/tasks để xem chi tiết.
 
-Hủy đăng ký: ${this.configService.get('FRONTEND_URL') || 'https://qltime.vercel.app'}/unsubscribe?token=${unsubscribeToken}
+Hủy đăng ký: ${this.getFrontendUrl()}/unsubscribe?token=${unsubscribeToken}
     `;
 
     return this.sendEmail({

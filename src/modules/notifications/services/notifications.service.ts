@@ -224,4 +224,114 @@ export class NotificationsService {
 
     return { message: 'Đã xóa đăng ký email thành công' };
   }
+
+  // Method để test gửi email với dữ liệu thật
+  async testSendEmailWithUserData(userId: string): Promise<any> {
+    try {
+      console.log(`🧪 Testing email notification for user: ${userId}`);
+
+      // 1. Tìm user
+      const user = await this.usersService.findById(userId);
+      if (!user) {
+        throw new NotFoundException('User không tồn tại');
+      }
+      console.log(`✅ Found user: ${user.name} (${user.email})`);
+
+      // 2. Tìm email subscriptions của user này
+      const subscriptions = await this.emailSubscriptionModel.find({
+        user: new Types.ObjectId(userId),
+        isActive: true,
+        taskReminders: true,
+      });
+      console.log(`📧 Found ${subscriptions.length} active email subscriptions`);
+
+      if (subscriptions.length === 0) {
+        return {
+          success: false,
+          message: 'Không có email subscription nào được tìm thấy cho user này',
+          userInfo: { id: userId, name: user.name, email: user.email }
+        };
+      }
+
+      // 3. Lấy tasks sắp hết hạn của user
+      const tasks = await this.tasksService.findTasksDueSoon(userId, 48); // 48h để test
+      console.log(`📋 Found ${tasks.length} tasks due soon`);
+
+      const results: Array<{
+        email: string;
+        success: boolean;
+        tasksCount: number;
+        tasks?: { title: string; dueDate: Date | undefined; }[];
+        message?: string;
+      }> = [];
+
+      // 4. Gửi email cho từng subscription
+      for (const subscription of subscriptions) {
+        console.log(`📤 Sending email to: ${subscription.email}`);
+
+        if (tasks.length > 0) {
+          const success = await this.emailService.sendTaskReminderEmail(
+            subscription.email,
+            tasks,
+          );
+
+          results.push({
+            email: subscription.email,
+            success,
+            tasksCount: tasks.length,
+            tasks: tasks.map(t => ({ title: t.title, dueDate: t.dueDate }))
+          });
+
+          if (success) {
+            subscription.lastNotificationSent = new Date();
+            await subscription.save();
+          }
+        } else {
+          // Gửi email test không có task
+          const success = await this.emailService.sendEmail({
+            to: subscription.email,
+            subject: 'QLTime - Test Email (Không có task sắp hết hạn)',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2563eb;">🧪 Test Email từ QLTime</h2>
+                <p>Xin chào <strong>${user.name}</strong>,</p>
+                <p>Đây là email test từ hệ thống QLTime.</p>
+                <p><strong>Thông tin:</strong></p>
+                <ul>
+                  <li>User ID: ${userId}</li>
+                  <li>Email đăng ký: ${subscription.email}</li>
+                  <li>Số task sắp hết hạn: ${tasks.length}</li>
+                </ul>
+                <p>Hệ thống email đang hoạt động bình thường! ✅</p>
+              </div>
+            `,
+            text: `Test email từ QLTime cho ${user.name}. Hệ thống hoạt động bình thường.`
+          });
+
+          results.push({
+            email: subscription.email,
+            success,
+            tasksCount: 0,
+            message: 'Test email sent (no tasks due)'
+          });
+        }
+      }
+
+      return {
+        success: true,
+        userInfo: { id: userId, name: user.name, email: user.email },
+        subscriptions: subscriptions.length,
+        tasksFound: tasks.length,
+        results
+      };
+
+    } catch (error) {
+      console.error('❌ Error in testSendEmailWithUserData:', error);
+      return {
+        success: false,
+        error: error.message,
+        userInfo: { id: userId }
+      };
+    }
+  }
 }

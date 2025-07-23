@@ -101,4 +101,21 @@ export class NotificationsController {
   async testScheduler() {
     return this.schedulerService.testSendReminders();
   }
+
+  @Post('test-email-with-user-data')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Test gửi email với dữ liệu thật của user hiện tại' })
+  @ApiResponse({ status: 200, description: 'Test thành công' })
+  @ApiResponse({ status: 401, description: 'Chưa xác thực' })
+  async testEmailWithUserData(@Request() req) {
+    return this.notificationsService.testSendEmailWithUserData(req.user.userId);
+  }
+
+  @Post('test-email-with-user-data/:userId')
+  @ApiOperation({ summary: 'Test gửi email với dữ liệu của user cụ thể (không cần auth)' })
+  @ApiResponse({ status: 200, description: 'Test thành công' })
+  async testEmailWithSpecificUser(@Param('userId') userId: string) {
+    return this.notificationsService.testSendEmailWithUserData(userId);
+  }
 }
